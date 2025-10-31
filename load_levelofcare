@@ -1,0 +1,81 @@
+CREATE OR REPLACE PROCEDURE dim.load_levelofcare()
+ LANGUAGE plpgsql
+AS $$
+BEGIN
+
+
+
+TRUNCATE TABLE dim.levelofcare;
+
+
+INSERT INTO dim.levelofcare(
+    fromdate,
+    todate,
+    levelofcarename,
+    levelofcaredescription,
+    levelofcareshortname,
+    levelofcareabbreviation,
+    entityid,
+    campusid,
+    entitycode,
+    facilitycode,
+    facilityname,
+    facilityabbreviation,
+    sourceid,
+    sourcecolumn,
+    sourcetable,
+    sourcesystem,
+    tenant
+)
+SELECT
+    a.fromdate,
+    a.todate,
+    a.levelofcarename     AS levelofcarename,
+    a.levelofcarename     AS levelofcaredescription,
+    a.levelofcare         AS levelofcareshortname,
+    a.levelofcare         AS levelofcareabbreviation,
+    a.entityid,
+    a.campusid,
+    a.entitycode::INTEGER           AS entitycode,
+    a.facilitycode,
+    a.facilityname,
+    a.facilityabbreviation,
+    a.sourceid,
+    a.sourcecolumn,
+    a.sourcetable,
+    a.sourcesystem,
+    a.tenant
+FROM (
+    SELECT DISTINCT
+        sf.created_date::date                           AS fromdate,
+        '9999-12-31'::date                              AS todate,
+        sf.name                                         AS levelofcarename,
+        CASE 
+            WHEN sf.name LIKE '%Oakview Personal Care%' THEN 'AL'
+            WHEN sf.name LIKE '%Assisted Living%' THEN 'AL'
+            WHEN sf.name LIKE '%Forestview Healthcare Center%' THEN 'SNF'
+            WHEN sf.name LIKE '%Healthcare Center%' THEN 'SNF'
+            WHEN sf.name LIKE '%Residential Living%' THEN 'IL'
+            ELSE NULL
+        END                                             AS levelofcare,
+        c.entityid                                      AS entityid,
+        c.campusid                                      AS campusid,
+        c.entitycode::INTEGER                                   AS entitycode,
+        sf.facility_code                                AS facilitycode,
+        sf.name                                         AS facilityname,
+        UPPER(REGEXP_REPLACE(sf.name, '[^A-Z]+', ''))   AS facilityabbreviation,
+        sf.fac_id::int                                  AS sourceid,
+        'fac_id'                                        AS sourcecolumn,
+        'facility'                                      AS sourcetable,
+        'source_pcc'                                    AS sourcesystem,
+        'ACM'                                           AS tenant
+    FROM dim.campus AS c
+    INNER JOIN source_pcc.facility AS sf ON sf.facility_code <> ''
+    AND c.entitycode = substring(sf.facility_code FROM 2)
+) AS a
+;
+
+
+
+END;
+$$
